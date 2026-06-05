@@ -1,0 +1,34 @@
+{
+  "name": "pixel-pet",
+  "displayName": "Pixel Pet",
+  "description": "Mascota de escritorio que representa tus agentes de Claude Code. Se enciende al activar la extensión.",
+  "version": "0.2.1",
+  "publisher": "gustavo",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/gustavo/pixel-pet" },
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "pixelPet.start",   "title": "Pixel Pet: Encender" },
+      { "command": "pixelPet.stop",    "title": "Pixel Pet: Apagar" },
+      { "command": "pixelPet.restart", "title": "Pixel Pet: Reiniciar" },
+      { "command": "pixelPet.toggle",  "title": "Pixel Pet: Alternar" }
+    ],
+    "configuration": {
+      "title": "Pixel Pet",
+      "properties": {
+        "pixelPet.path": {
+          "type": "string", "default": "",
+          "description": "Ruta absoluta a la carpeta de la app de la mascota (donde está main.js)."
+        },
+        "pixelPet.autoStart": {
+          "type": "boolean", "default": true,
+          "description": "Encender la mascota automáticamente al activar la extensión."
+        }
+      }
+    }
+  }
+}

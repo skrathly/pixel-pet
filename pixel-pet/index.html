@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; width: 100%; height: 100%; cursor: default; }
+    #stage { display: block; width: 100vw; height: 100vh; }
+
+    /* Pantalla estilo consola: líneas que entran abajo y suben */
+    .screen {
+      position: fixed; display: none; left: 0; top: 0; z-index: 10; pointer-events: none;
+      width: 168px; height: 60px; box-sizing: border-box;
+      background: #0b0f14; border: 1px solid #2b3140; border-radius: 5px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.4);
+      padding: 5px 7px 4px;
+      font: 9px/1.45 "Cascadia Code", "Consolas", ui-monospace, monospace;
+      overflow: hidden;
+    }
+    .screen-head { color: #7d8597; font-size: 8px; letter-spacing: .3px; margin-bottom: 2px; }
+    /* las líneas se anclan al fondo: el contenido nuevo empuja al viejo hacia arriba */
+    .screen-log { display: flex; flex-direction: column; justify-content: flex-end; height: 38px; overflow: hidden; }
+    .screen-line { color: #cfe8d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .screen-line .prompt { color: #6a9955; }
+    .screen-line.cur::after { content: '_'; color: #cfe8d6; animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .screen::after { content:''; position:absolute; left:50%; bottom:-6px; transform:translateX(-50%);
+      border-left:6px solid transparent; border-right:6px solid transparent; border-top:6px solid #0b0f14; }
+
+    /* Globito de saludo */
+    .hi {
+      position: fixed; display: none; left: 0; top: 0; z-index: 11; pointer-events: none;
+      background: #fffceb; border: 1px solid #e0c873; border-radius: 10px;
+      padding: 2px 7px; font: 11px/1.2 -apple-system, "Segoe UI", sans-serif; color: #6b5a1e;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.18); white-space: nowrap;
+    }
+    .hi::after { content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%);
+      border-left:5px solid transparent; border-right:5px solid transparent; border-top:5px solid #fffceb; }
+
+    /* Globito de despedida (dramático) */
+    .hi.bye { background: #1a1a2e; border-color: #7c5cbf; color: #d4c5f5; }
+    .hi.bye::after { border-top-color: #1a1a2e; }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <script src="renderer.js"></script>
+</body>
+</html>
