@@ -8,21 +8,23 @@ Terminal:
   C:>claude 
           ingresar promt
 
-  Esta desplegara el personaje. hasta que el agente cierre. o se desactive la mascota. dese vscode
+  Esta desplegara el personaje y caminara por la barra de tareas hasta que el agente se cierre o desactives la mascota dese vscode.
 
   Usando el comando ctl+shift+p
   ingresando pixel-pet veremos los comandos: Encender, Apagar, Alternar, Reiniciar.
-  tambien puedes encender y apagar la mascota desde la parte inferior derecha de VSCODE: veras PET: on/off segun sea el caso
+  tambien puedes encender y apagar la mascota desde la parte inferior derecha de VSCODE: veras PET: on/off segun sea el caso.
 
 
 Puedes descargar su instalador desde aqui:
 
 https://github.com/skrathly/pixel-pet/blob/main/pixel-pet-setup.zip
 
+
+
+
 **********************************************************************
                       Pixel Pet — Instalador
 **********************************************************************
-
 
 Requisitos previos:
 
@@ -39,7 +41,7 @@ Pasos:
 
 El instalador:
 
-  ✔ Copia los archivos a %LOCALAPPDATA%\PixelPet\app
+  ✔ Copia los archivos necesarios
   
   ✔ Descarga Electron automáticamente (primera vez)
   
