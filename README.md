@@ -5,9 +5,9 @@ Puedes descargar su instalador desde aqui:
 
 https://github.com/skrathly/pixel-pet/blob/main/pixel-pet-setup.zip
 
-╔══════════════════════════════════════════╗
-║         Pixel Pet — Instalador           ║
-╚══════════════════════════════════════════╝
+**********************************************************************
+                      Pixel Pet — Instalador
+**********************************************************************
 
 Requisitos previos:
   • Node.js  (https://nodejs.org)
