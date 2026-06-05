@@ -1,6 +1,17 @@
 # pixel-pet
 Es una representación de agentes animados para vscode con claude-code.
 
+Al crear un agente desde vscode usando la terminal
+
+Ejm:
+Terminal:
+  C:>claude 
+          ingresar promt
+
+  Esta desplegara el personaje. hasta que el agente cierre. o se desactive la mascota. dese vscode
+
+  Usando el comando ctl+shift+p
+
 Puedes descargar su instalador desde aqui:
 
 https://github.com/skrathly/pixel-pet/blob/main/pixel-pet-setup.zip
