@@ -11,6 +11,9 @@ Terminal:
   Esta desplegara el personaje. hasta que el agente cierre. o se desactive la mascota. dese vscode
 
   Usando el comando ctl+shift+p
+  ingresando pixel-pet veremos los comandos: Encender, Apagar, Alternar, Reiniciar.
+  tambien puedes encender y apagar la mascota desde la parte inferior derecha de VSCODE: veras PET: on/off segun sea el caso
+
 
 Puedes descargar su instalador desde aqui:
 
