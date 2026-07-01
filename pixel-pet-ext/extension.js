@@ -74,7 +74,7 @@ function updateStatus() {
 
 function activate(context) {
   out = vscode.window.createOutputChannel('Pixel Pet');
-  log('extensión activada (v0.3.0)');
+  log('extensión activada (v0.3.1)');
   statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusItem.command = 'pixelPet.toggle';
   statusItem.show();
