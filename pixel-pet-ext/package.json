@@ -2,7 +2,7 @@
   "name": "pixel-pet",
   "displayName": "Pixel Pet",
   "description": "Mascota de escritorio que representa tus agentes de Claude Code. Se enciende al activar la extensión.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "gustavo",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/gustavo/pixel-pet" },

@@ -56,12 +56,30 @@ function createWindow() {
 ipcMain.on('set-ignore', (e, ig) => { lastIgnore = ig; if (win) win.setIgnoreMouseEvents(ig, { forward: true }); });
 ipcMain.on('hop', (e, dir) => { const n = neighbor(dir); if (n >= 0) place(n, dir === 'right' ? 'left' : 'right'); });
 
-// ============ Lector de transcripts: UN agente por sesión ============
-const PROJECTS_DIR = process.env.CLAUDE_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects');
-const SESSION_TTL = 120000;   // ms sin ESCRIBIR -> sesión cerrada (se desmaterializa)
-const sessions = new Map();   // file -> { offset, lastActivity, task, cwd, working }
+// ============ Lector de sesiones activas + transcripts ============
+// Presencia = existe ~/.claude/sessions/<pid>.json (Claude Code lo borra al cerrar sesión).
+// "Trabajando" (espaldas + pantallita) = ese registro dice status:"busy".
+const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+const SESSIONS_DIR = path.join(CLAUDE_DIR, 'sessions');
+const PROJECTS_DIR = process.env.CLAUDE_PROJECTS_DIR || path.join(CLAUDE_DIR, 'projects');
+const registryState = new Map();   // sessionId -> { offset, task }  (solo para texto de la tarea)
 let lastSent = '';
 
+function pidAlive(pid) {
+  try { process.kill(pid, 0); return true; }
+  catch { return false; }   // proceso muerto sin haber limpiado su registro -> tratar como cerrada
+}
+function readRegistry() {
+  const found = new Map();   // sessionId -> { pid, cwd, status }
+  let names; try { names = fs.readdirSync(SESSIONS_DIR); } catch { return found; }
+  for (const name of names) {
+    if (!name.endsWith('.json')) continue;
+    let info; try { info = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, name), 'utf8')); } catch { continue; }
+    if (!info || !info.sessionId || !info.pid || !pidAlive(info.pid)) continue;
+    found.set(info.sessionId, info);
+  }
+  return found;
+}
 function listJsonl(dir, depth, out) {
   if (depth < 0) return;
   let entries; try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
@@ -103,100 +121,59 @@ function toolToText(name, input) {
     default: return name ? ('Usando ' + name) : null;
   }
 }
-// Procesa una línea del transcript y actualiza el estado de la sesión.
-// "working" sigue el TURNO del agente: arranca con un mensaje del usuario o una
-// herramienta, y termina solo cuando el asistente cierra con un mensaje de texto.
-function applyLine(s, obj) {
-  if (obj.cwd) s.cwd = obj.cwd;
-
-  // Señal de cierre: Claude Code escribe "last-prompt" al hacer /exit
-  if (obj.type === 'last-prompt') {
-    s.closing = true;      // activar despedida → se despide y luego se desmaterializa
-    s.working = false;
-    s.task = null;
-    return;
-  }
-
+function taskFromObj(obj) {
   const msg = obj.message || obj;
-  const type = obj.type || (msg && msg.role);
   const content = msg && msg.content;
-
-  if (type === 'assistant') {
-    if (Array.isArray(content)) {
-      // tarea = última herramienta usada
-      for (let i = content.length - 1; i >= 0; i--) {
-        const b = content[i];
-        if (b && b.type === 'tool_use') { s.task = toolToText(b.name, b.input); break; }
-      }
-      const hasTool = content.some(b => b && b.type === 'tool_use');
-      s.working = hasTool;                 // termina herramienta -> sigue; solo texto -> turno cerrado
-      if (!hasTool) s.task = null;
-    } else {
-      s.working = false;                   // respuesta de texto final -> libre
-      s.task = null;
+  if (Array.isArray(content)) {
+    for (let i = content.length - 1; i >= 0; i--) {
+      const b = content[i];
+      if (b && b.type === 'tool_use') return toolToText(b.name, b.input);
     }
-  } else if (type === 'user') {
-    s.working = true;                      // prompt del usuario o tool_result -> trabajando
-    if (!s.task) s.task = 'Pensando…';
-  }
-  // otros tipos (system, summary) no cambian el estado
+    if (msg.role === 'assistant') return 'Pensando…';
+  } else if (typeof content === 'string' && msg.role === 'assistant') return 'Pensando…';
+  return undefined;
 }
-function sessionId(file) { return baseName(file).replace(/\.jsonl$/, ''); }
-function agentLabel(s, file) {
-  if (s.cwd) return baseName(s.cwd);
-  return baseName(path.dirname(file)) || sessionId(file).slice(0, 8);
-}
+function sessionIdOf(file) { return baseName(file).replace(/\.jsonl$/, ''); }
 
 function tick() {
   if (!win) return;
-  const files = []; listJsonl(PROJECTS_DIR, 3, files);
-  const now = Date.now();
-  for (const f of files) {
-    let s = sessions.get(f);
-    if (!s) { s = { offset: 0, lastActivity: now, task: null, cwd: null, working: false }; sessions.set(f, s); }
-    const lines = readNew(f, s);
-    if (lines.length) s.lastActivity = now;
-    for (const ln of lines) { let obj; try { obj = JSON.parse(ln); } catch { continue; } applyLine(s, obj); }
-  }
+  const reg = readRegistry();   // sesiones abiertas AHORA MISMO, según Claude Code
+
+  const jsonlFiles = []; listJsonl(PROJECTS_DIR, 3, jsonlFiles);
+  const jsonlBySession = new Map();
+  for (const f of jsonlFiles) jsonlBySession.set(sessionIdOf(f), f);
+
+  for (const id of registryState.keys()) if (!reg.has(id)) registryState.delete(id);   // limpiar sesiones cerradas
+
   const agents = [];
-  for (const [f, s] of sessions) {
-    if (s.closing) {
-      if (!s.closingAt) s.closingAt = now;
-      if (now - s.closingAt < 4000)        // ventana de despedida (4s: 2.5s animación + margen)
-        agents.push({ id: sessionId(f), label: agentLabel(s, f), working: false, task: null, farewell: true });
-      // después de 4s no se incluye → renderer lo desmaterializa
-    } else if (now - s.lastActivity <= SESSION_TTL) {
-      agents.push({ id: sessionId(f), label: agentLabel(s, f), working: !!s.working, task: s.working ? (s.task || 'Pensando…') : null });
+  for (const [id, info] of reg) {
+    let rec = registryState.get(id);
+    if (!rec) { rec = { offset: null, task: null }; registryState.set(id, rec); }
+    const busy = info.status === 'busy';
+    if (busy) {
+      const file = jsonlBySession.get(id);
+      if (file) {
+        if (rec.offset === null) { try { rec.offset = fs.statSync(file).size; } catch { rec.offset = 0; } }
+        for (const ln of readNew(file, rec)) {
+          let obj; try { obj = JSON.parse(ln); } catch { continue; }
+          const t = taskFromObj(obj);
+          if (t !== undefined) rec.task = t;
+        }
+      }
+    } else {
+      rec.task = null; rec.offset = null;   // al volver a estar ocupada, retomar desde el final actual
     }
+    agents.push({ id, label: baseName(info.cwd) || id.slice(0, 8), task: busy ? (rec.task || 'Procesando…') : null });
   }
   const j = JSON.stringify(agents);
   if (j !== lastSent) { lastSent = j; win.webContents.send('agents', agents); }
 }
 function startReader() {
   if (readerStarted) return; readerStarted = true;
-  const files = []; listJsonl(PROJECTS_DIR, 3, files);
-  for (const f of files) { try { sessions.set(f, { offset: fs.statSync(f).size, lastActivity: 0, task: null, cwd: null, working: false }); } catch {} }
-
-  // Polling cada 1s como respaldo
-  setInterval(tick, 1000);
-
-  // fs.watch: aviso instantáneo del SO cuando aparece/cambia un .jsonl
-  let debounce = null;
-  const wake = () => { if (debounce) return; debounce = setTimeout(() => { debounce = null; tick(); }, 150); };
-  try {
-    fs.watch(PROJECTS_DIR, { recursive: true }, (event, filename) => {
-      if (filename && filename.endsWith('.jsonl')) wake();
-    });
-  } catch (e) { /* si la carpeta no existe aún, el polling se encarga */ }
-
-  tick();
+  setInterval(tick, 1000); tick();
 }
 
-const _singleLock = app.requestSingleInstanceLock();
-if (!_singleLock) app.quit();
-
 app.whenReady().then(() => {
-  if (!_singleLock) return;
   createWindow();
   globalShortcut.register('CommandOrControl+Alt+Right', () => place(curDisplay + 1));
   globalShortcut.register('CommandOrControl+Alt+Left',  () => place(curDisplay - 1));

@@ -18,8 +18,7 @@ const WALK_SEQUENCE = [0, 1, 2, 1];
 const STAND_COL = 1;
 
 // ---- Caché de sprites ---------------------------------------
-const SPRITES = ['sprites/char1.png','sprites/char2.png','sprites/char3.png','sprites/char4.png',
-                 'sprites/char5.png','sprites/char6.png','sprites/char7.png','sprites/char8.png'];
+const SPRITES = ['sprites/char1.png','sprites/char2.png','sprites/char3.png','sprites/char4.png','sprites/char5.png','sprites/char6.png','sprites/char7.png','sprites/char8.png'];
 const cache = {};
 function loadSprite(file) {
   if (cache[file]) return cache[file];
@@ -61,79 +60,75 @@ const SPAWN_DUR = 0.9, DESPAWN_DUR = 0.7;
 const GREET_DIST = 34;          // px de cercanía para saludarse
 const GREET_TIME = 1.4;         // duración del saludo
 const GREET_COOLDOWN = 6;       // s antes de poder volver a saludar
-const FAREWELL_TIME = 2.8;      // s que dura la despedida antes de desvanecerse
-
-const FAREWELLS = [
-  '¡Nos vemos pronto! 👋',
-  'Ha llegado mi hora...',
-  'Mi destino se ha cumplido.',
-  'El código me llama hacia la luz.',
-  'Hasta la próxima compilación. 🫡',
-  'Me voy... pero el bug sigue ahí.',
-  'Adiós, cruel deadline.',
-  '¡Fue un honor servir! ⚔️',
-  'Off to git commit... forever.',
-  'sudo shutdown -h now 😔',
-  'Regresaré... con más features.',
-  '404: farewell not found.',
-  'Cerrando proceso... ✨',
-  'El stack trace me esperaba.',
-  '¡Hasta la vista, baby! 🕶️',
-  'Y así... termina mi ejecución.',
-];
-const randomFarewell = () => FAREWELLS[Math.floor(Math.random() * FAREWELLS.length)];
 
 // ---- Personajes ---------------------------------------------
 const pets = new Map();
-const spriteForSession = new Map();   // persiste aunque el pet muera/reaparezca
-
-function pickSprite(id) {
-  if (spriteForSession.has(id)) return spriteForSession.get(id);  // siempre el mismo
-  const used = new Set([...pets.values()].map(p => p.spriteName));
-  const avail = SPRITES.filter(s => !used.has(s));
-  const pool = avail.length > 0 ? avail : SPRITES;
-  const chosen = pool[Math.floor(Math.random() * pool.length)];
-  spriteForSession.set(id, chosen);
-  return chosen;
-}
 let draggingId = null, hopPending = false, mouseX = -1, mouseY = -1, ignoring = true;
 
-// --- Pantalla estilo consola por personaje ---
-const SCREEN_LINES = 4;         // líneas visibles en la mini-consola
+// --- Pantalla "Matrix" por personaje (canvas propio) ---
+const MATRIX_CHARS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノﾊﾋﾌﾍﾎ0123456789<>$#*+=/'.split('');
 function makeScreen() {
   const el = document.createElement('div'); el.className = 'screen';
+  const cv = document.createElement('canvas');
+  const ov = document.createElement('div'); ov.className = 'screen-overlay';
   const head = document.createElement('div'); head.className = 'screen-head';
-  const logEl = document.createElement('div'); logEl.className = 'screen-log';
-  el.appendChild(head); el.appendChild(logEl);
+  const body = document.createElement('div'); body.className = 'screen-body';
+  ov.appendChild(head); ov.appendChild(body);
+  el.appendChild(cv); el.appendChild(ov);
   el.style.display = 'none'; document.body.appendChild(el);
-  return { el, head, logEl, lines: [] };
+  return { el, cv, cctx: cv.getContext('2d'), head, body, cols: null, drops: null };
 }
-// agrega una línea nueva abajo; las viejas suben (se recorta a SCREEN_LINES)
-function pushLine(scr, text) {
-  scr.lines.push(text);
-  while (scr.lines.length > SCREEN_LINES) scr.lines.shift();
-  scr.logEl.innerHTML = scr.lines.map((t, i) => {
-    const cur = i === scr.lines.length - 1 ? ' cur' : '';
-    return '<div class="screen-line' + cur + '"><span class="prompt">$ </span>' + escapeHtml(t) + '</div>';
-  }).join('');
+function matrixStep(scr) {
+  const W = scr.el.clientWidth, H = scr.el.clientHeight;
+  if (scr.cv.width !== W || scr.cv.height !== H) {
+    scr.cv.width = W; scr.cv.height = H;
+    const step = 8; scr.cols = Math.max(1, Math.floor(W / step)); scr.step = step;
+    scr.drops = Array.from({ length: scr.cols }, () => Math.random() * -H);
+  }
+  const g = scr.cctx, step = scr.step;
+  g.fillStyle = 'rgba(2,5,10,0.28)'; g.fillRect(0, 0, W, H);   // estela
+  g.font = '9px monospace';
+  for (let i = 0; i < scr.cols; i++) {
+    const ch = MATRIX_CHARS[(Math.random() * MATRIX_CHARS.length) | 0];
+    const x = i * step, y = scr.drops[i];
+    g.fillStyle = '#9dffc4'; g.fillText(ch, x, y);            // cabeza brillante
+    g.fillStyle = '#1f7a3f'; g.fillText(ch, x, y - step);     // cola tenue
+    scr.drops[i] += step;
+    if (scr.drops[i] > H && Math.random() > 0.975) scr.drops[i] = 0;
+  }
 }
 
 // --- globito de saludo ---
+const GREET_RANDOM = [
+  '¡hola!',
+  '¿qué más parce?',
+  'muévete, déjame pasar',
+  'ponte a trabajar',
+  'pídele al dev tareas',
+  'aún hay bugs y sigues aquí sin hacer nada',
+];
+function greetByHour() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return '¡buenos días!';
+  if (h >= 12 && h < 19) return '¡buenas tardes!';
+  return '¡buenas noches!';
+}
+function pickGreeting() {
+  return Math.random() < 0.35 ? greetByHour() : GREET_RANDOM[Math.floor(Math.random() * GREET_RANDOM.length)];
+}
 function makeHi() { const el = document.createElement('div'); el.className = 'hi'; el.textContent = '¡hola!'; el.style.display = 'none'; document.body.appendChild(el); return el; }
 
 function makePet(id, label) {
   const screen = makeScreen(); screen.head.textContent = (label || 'agent').slice(0, 22);
   const hi = makeHi();
-  const spriteName = pickSprite(id);
   return {
-    id, label: label || '', task: null, working: false, spriteName,
-    sprite: loadSprite(spriteName),
+    id, label: label || '', task: null,
+    sprite: loadSprite(SPRITES[Math.floor(Math.random() * SPRITES.length)]),
     x: MARGIN + Math.random() * Math.max(1, canvas.width - 2 * MARGIN),
     y: groundY(), dir: Math.random() < 0.5 ? -1 : 1, speed: 65,
     state: 'spawn', seqIdx: 0, frameTimer: 0, frameInterval: 0.15,
     progress: 0, stateTimer: 0, vy: 0, grabX: 0, grabY: 0, dead: false,
     greetT: 0, greetCool: 0, faceDir: 1,
-    farewell: false, farewellMsg: '', farewellT: 0,
     screen, hi
   };
 }
@@ -149,19 +144,11 @@ if (window.petAPI && window.petAPI.onAgents) window.petAPI.onAgents(list => {
     seen.add(a.id);
     let p = pets.get(a.id);
     if (!p) { p = makePet(a.id, a.label); pets.set(a.id, p); }
-    p.label = a.label || p.label; p.task = a.task || null; p.working = !!a.working;
+    p.label = a.label || p.label; p.task = a.task || null;
     if (p.screen) p.screen.head.textContent = (p.label || 'agent').slice(0, 22);
-    // activar despedida una sola vez
-    if (a.farewell && !p.farewell) {
-      p.farewell = true; p.farewellMsg = randomFarewell(); p.farewellT = FAREWELL_TIME;
-      p.state = 'farewell'; p.working = false;
-      p.hi.textContent = p.farewellMsg; p.hi.classList.add('bye');
-    }
-    if (!a.farewell && p.state === 'despawn') { p.state = 'spawn'; p.progress = 0; }
+    if (p.state === 'despawn') { p.state = 'spawn'; p.progress = 0; }
   }
-  for (const [id, p] of pets)
-    if (!seen.has(id) && p.state !== 'despawn' && p.state !== 'farewell')
-      { p.state = 'despawn'; p.progress = 0; }
+  for (const [id, p] of pets) if (!seen.has(id) && p.state !== 'despawn') { p.state = 'despawn'; p.progress = 0; }
 });
 
 // ---- Salto de pantalla --------------------------------------
@@ -208,6 +195,8 @@ function tryGreet() {
       a.faceDir = (b.x >= a.x) ? 1 : -1;          // mirarse de frente
       b.faceDir = -a.faceDir;
       a.jump = b.jump = 0;
+      a.hi.textContent = pickGreeting();
+      b.hi.textContent = pickGreeting();
     }
   }
 }
@@ -216,7 +205,7 @@ function tryGreet() {
 function updatePet(p, dt) {
   if (!p.sprite.ready) return;
   if (p.greetCool > 0) p.greetCool -= dt;
-  const working = !!p.working;
+  const working = !!p.task;
   if (p.state !== 'drag' && p.state !== 'fall') p.y = groundY();
 
   // Entrar/salir de "trabajo" según haya tarea (solo desde estados libres)
@@ -246,10 +235,7 @@ function updatePet(p, dt) {
       p.jump = (p.jump || 0) + dt;
       if (p.greetT <= 0) { p.state = working ? 'work' : 'walk'; p.greetCool = GREET_COOLDOWN; p.dir = -p.faceDir; }
       break;
-    case 'farewell':
-      p.farewellT -= dt;
-      if (p.farewellT <= 0) { p.state = 'despawn'; p.progress = 0; }
-      break;
+    case 'drag': break;
     case 'fall':
       p.vy += 900 * dt; p.y += p.vy * dt;
       if (p.y >= groundY()) { p.y = groundY(); p.state = working ? 'work' : 'walk'; } break;
@@ -272,8 +258,7 @@ function drawShadow(p, alpha) {
   ctx.beginPath(); ctx.ellipse(p.x, groundY() + 1, FW * SCALE * 0.36 * k, 4 * k, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 }
 function frameRowCol(p) {
-  if (p.state === 'work') return [DIR.BACK, STAND_COL];
-  if (p.state === 'farewell') return [DIR.FRONT, STAND_COL];   // se despide de frente
+  if (p.state === 'work') return [DIR.BACK, STAND_COL];                 // de espaldas, quieto
   if (p.state === 'greet') return [p.faceDir < 0 ? DIR.LEFT : DIR.RIGHT, STAND_COL];
   if (p.state === 'walk') return [p.dir < 0 ? DIR.LEFT : DIR.RIGHT, WALK_SEQUENCE[p.seqIdx]];
   return [DIR.FRONT, STAND_COL];
@@ -309,18 +294,22 @@ function placeAbove(el, p, gap) {
 function updateScreen(p) {
   const scr = p.screen;
   if (p.state === 'work') {
-    scr.el.style.display = 'block';
-    // cada nueva tarea entra como línea nueva abajo (las viejas suben)
-    if (scr.lastTask !== p.task) { scr.lastTask = p.task; pushLine(scr, p.task || ''); }
+    if (scr.el.style.display !== 'block') {
+      scr.el.style.display = 'block';
+      scr.body.innerHTML = '<span class="prompt">$ </span>' + escapeHtml(p.task || '') + '<span class="cursor">_</span>';
+    } else {
+      // refrescar texto si cambió la tarea
+      const want = '<span class="prompt">$ </span>' + escapeHtml(p.task || '') + '<span class="cursor">_</span>';
+      if (scr.body.dataset.t !== (p.task || '')) { scr.body.innerHTML = want; scr.body.dataset.t = (p.task || ''); }
+    }
+    matrixStep(scr);
     placeAbove(scr.el, p, 12);
   } else if (scr.el.style.display !== 'none') {
     scr.el.style.display = 'none';
-    scr.lastTask = undefined; scr.lines = []; scr.logEl.innerHTML = '';   // limpiar al dejar de trabajar
   }
 }
 function updateHi(p) {
-  if (p.state === 'greet' || p.state === 'farewell')
-    { p.hi.style.display = 'block'; placeAbove(p.hi, p, 8); }
+  if (p.state === 'greet') { p.hi.style.display = 'block'; placeAbove(p.hi, p, 8); }
   else if (p.hi.style.display !== 'none') p.hi.style.display = 'none';
 }
 function escapeHtml(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
@@ -337,11 +326,9 @@ function render() {
   }
 }
 
-let dtNow = 0;
 let last = performance.now();
 function loop(now) {
   let dt = (now - last) / 1000; if (dt > 0.1) dt = 0.1; last = now;
-  dtNow = dt;
   update(dt); render();
   requestAnimationFrame(loop);
 }
